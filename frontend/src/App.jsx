@@ -1,5 +1,6 @@
 import { Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom'
 import './App.css'
+import { NetworkGraph } from './components/NetworkGraph'
 
 const Dashboard = () => {
   return (
@@ -72,6 +73,17 @@ const Dashboard = () => {
             <li>Share the weekly health summary with stakeholders.</li>
           </ol>
         </article>
+      </section>
+
+      <section className="panel wide" aria-label="Network simulation">
+        <header className="panel-header">
+          <div>
+            <p className="eyebrow">Live topology</p>
+            <h2>Packet flow visualizer</h2>
+            <p className="lede">Force-directed map showing queue pressure and bandwidth utilization.</p>
+          </div>
+        </header>
+        <NetworkGraph />
       </section>
     </main>
   )
