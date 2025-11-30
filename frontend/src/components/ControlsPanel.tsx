@@ -13,9 +13,16 @@ interface ControlsPanelProps {
   firewallRules: FirewallRule[]
   onAttackModeChange: (mode: AttackMode) => void
   onAddFirewallRule: (rule: { startIp: string; endIp: string; label?: string }) => void
+  onAddServer: () => void
 }
 
-export function ControlsPanel({ attackMode, firewallRules, onAttackModeChange, onAddFirewallRule }: ControlsPanelProps) {
+export function ControlsPanel({
+  attackMode,
+  firewallRules,
+  onAttackModeChange,
+  onAddFirewallRule,
+  onAddServer,
+}: ControlsPanelProps) {
   const [startIp, setStartIp] = useState('203.0.113.1')
   const [endIp, setEndIp] = useState('203.0.113.255')
   const [label, setLabel] = useState('Red team block')
@@ -62,6 +69,9 @@ export function ControlsPanel({ attackMode, firewallRules, onAttackModeChange, o
           <h3>Drop hostile sources</h3>
           <p className="muted">Add CIDR-style ranges to cut off attacker IPs and observe recovery.</p>
         </div>
+        <button type="button" className="secondary" onClick={onAddServer}>
+          Add server
+        </button>
       </div>
 
       <form className="firewall-form" onSubmit={submitRule}>

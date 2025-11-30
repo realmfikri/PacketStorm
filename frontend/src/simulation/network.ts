@@ -43,6 +43,8 @@ export class NetworkSimulation {
   private events: SimulationEvent[] = []
   private attackMode: AttackMode = 'idle'
   private firewallRules: InternalFirewallRule[] = []
+  private appServerCount = 1
+  private serviceRotation = 0
 
   constructor() {
     this.nodes = new Map(
@@ -70,20 +72,22 @@ export class NetworkSimulation {
       { id: 'core-db', source: 'core', target: 'db', bandwidth: 90, utilization: 0, recentBytes: 0 },
     ]
 
-    this.nodes.forEach((node) =>
-      node.queue.onUpdate(({ nodeId, packet, reason }) => {
-        if (reason === 'dropped') {
-          node.droppedCount += 1
-          this.recordEvent('packet.dropped', {
-            detail: `Queue full on ${node.label}; dropped ${packet.type} packet (${packet.size}B)`,
-            nodeId,
-            trafficType: packet.type,
-          })
-        } else {
-          node.queueDepth = node.queue.depth()
-        }
-      }),
-    )
+    this.nodes.forEach((node) => this.attachQueueListener(node))
+  }
+
+  private attachQueueListener(node: InternalNode) {
+    node.queue.onUpdate(({ nodeId, packet, reason }) => {
+      if (reason === 'dropped') {
+        node.droppedCount += 1
+        this.recordEvent('packet.dropped', {
+          detail: `Queue full on ${node.label}; dropped ${packet.type} packet (${packet.size}B)`,
+          nodeId,
+          trafficType: packet.type,
+        })
+      } else {
+        node.queueDepth = node.queue.depth()
+      }
+    })
   }
 
   onEvent(listener: EventListener) {
@@ -95,6 +99,44 @@ export class NetworkSimulation {
     this.recordEvent('firewall.updated', {
       detail: `Attack profile switched to ${mode.toUpperCase()}`,
       trafficType: 'attacker',
+    })
+  }
+
+  addAppServer() {
+    this.appServerCount += 1
+    const id = `app-${this.appServerCount}`
+    const label = `App Server ${this.appServerCount}`
+    const processingRate = 5 + Math.floor(Math.random() * 3)
+    const queueCapacity = 12 + Math.floor(Math.random() * 6)
+
+    const node: InternalNode = {
+      id,
+      label,
+      role: 'service',
+      processingRate,
+      queueCapacity,
+      queueDepth: 0,
+      processedCount: 0,
+      droppedCount: 0,
+      processing: false,
+      queue: new PacketQueue(queueCapacity),
+    }
+
+    this.nodes.set(id, node)
+    this.attachQueueListener(node)
+
+    this.links.push({
+      id: `core-${id}`,
+      source: 'core',
+      target: id,
+      bandwidth: 110 + Math.floor(Math.random() * 30),
+      utilization: 0,
+      recentBytes: 0,
+    })
+
+    this.recordEvent('topology.updated', {
+      detail: `${label} added behind the load balancer`,
+      trafficType: 'legitimate',
     })
   }
 
@@ -188,7 +230,7 @@ export class NetworkSimulation {
         const availableLinks = this.links.filter((link) => link.source === node.id)
         if (!availableLinks.length) return
 
-        const chosen = randomChoice(availableLinks)
+        const chosen = node.id === 'core' ? this.selectBalancedLink(availableLinks) : randomChoice(availableLinks)
         const destination = this.nodes.get(chosen.target)
         if (!destination) return
 
@@ -208,6 +250,20 @@ export class NetworkSimulation {
         }
       })
     })
+  }
+
+  private selectBalancedLink(links: InternalLink[]): InternalLink {
+    const serviceLinks = links.filter((link) => this.nodes.get(link.target)?.role === 'service')
+    if (serviceLinks.length) {
+      const useServicePath = Math.random() > 0.12 || links.length === serviceLinks.length
+      if (useServicePath) {
+        const link = serviceLinks[this.serviceRotation % serviceLinks.length]
+        this.serviceRotation += 1
+        return link
+      }
+    }
+
+    return randomChoice(links)
   }
 
   private decayUtilization() {
