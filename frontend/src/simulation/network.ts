@@ -1,5 +1,14 @@
 import { PacketQueue, createPacket } from './queue'
-import type { LinkState, NodeState, SimulationEvent, SimulationEventType, SimulationSnapshot, TrafficType } from './types'
+import { buildTrafficPlan, type TrafficSeed } from './traffic'
+import type {
+  AttackMode,
+  FirewallRule,
+  LinkState,
+  NodeState,
+  SimulationEvent,
+  SimulationEventType,
+  SimulationSnapshot,
+} from './types'
 
 interface InternalNode extends NodeState {
   queue: PacketQueue
@@ -11,8 +20,20 @@ interface InternalLink extends LinkState {
 
 type EventListener = (event: SimulationEvent) => void
 
+interface InternalFirewallRule extends FirewallRule {
+  start: number
+  end: number
+}
+
 function randomChoice<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)]
+}
+
+function ipToNumber(ip: string): number {
+  return ip
+    .split('.')
+    .map(Number)
+    .reduce((acc, value) => (acc << 8) + value, 0)
 }
 
 export class NetworkSimulation {
@@ -20,6 +41,8 @@ export class NetworkSimulation {
   private links: InternalLink[]
   private listeners: EventListener[] = []
   private events: SimulationEvent[] = []
+  private attackMode: AttackMode = 'idle'
+  private firewallRules: InternalFirewallRule[] = []
 
   constructor() {
     this.nodes = new Map(
@@ -67,6 +90,43 @@ export class NetworkSimulation {
     this.listeners.push(listener)
   }
 
+  setAttackMode(mode: AttackMode) {
+    this.attackMode = mode
+    this.recordEvent('firewall.updated', {
+      detail: `Attack profile switched to ${mode.toUpperCase()}`,
+      trafficType: 'attacker',
+    })
+  }
+
+  addFirewallRule(rule: { startIp: string; endIp: string; label?: string }) {
+    const normalized: InternalFirewallRule = {
+      id: crypto.randomUUID(),
+      label: rule.label ?? `${rule.startIp} → ${rule.endIp}`,
+      startIp: rule.startIp,
+      endIp: rule.endIp,
+      start: ipToNumber(rule.startIp),
+      end: ipToNumber(rule.endIp),
+    }
+    this.firewallRules = [normalized, ...this.firewallRules].slice(0, 6)
+    this.recordEvent('firewall.updated', {
+      detail: `New firewall block: ${normalized.label}`,
+      trafficType: 'attacker',
+    })
+  }
+
+  getFirewallRules(): FirewallRule[] {
+    return this.firewallRules.map(({ start, end, ...rule }) => rule)
+  }
+
+  getAttackMode() {
+    return this.attackMode
+  }
+
+  private matchesFirewall(ip: string): boolean {
+    const numeric = ipToNumber(ip)
+    return this.firewallRules.some((rule) => numeric >= rule.start && numeric <= rule.end)
+  }
+
   private recordEvent(type: SimulationEventType, data: Omit<SimulationEvent, 'id' | 'at' | 'type'>) {
     const event: SimulationEvent = {
       id: crypto.randomUUID(),
@@ -85,16 +145,28 @@ export class NetworkSimulation {
   }
 
   private generateTraffic() {
-    const trafficBurst = Math.floor(Math.random() * 5) + 2
-    for (let i = 0; i < trafficBurst; i += 1) {
-      const type: TrafficType = Math.random() > 0.75 ? 'attacker' : 'legitimate'
-      const packet = createPacket(type)
-      const ingress = this.nodes.get('ingress')!
+    const ingress = this.nodes.get('ingress')!
+    const plan = buildTrafficPlan(this.attackMode)
+    const seeds: TrafficSeed[] = [...plan.legitimate, ...plan.attacker]
+
+    seeds.forEach((seed) => {
+      const packet = createPacket(seed.type, seed)
+
+      if (packet.type === 'attacker' && this.matchesFirewall(packet.sourceIp)) {
+        ingress.droppedCount += 1
+        this.recordEvent('packet.filtered', {
+          detail: `Firewall dropped attack from ${packet.sourceIp}`,
+          nodeId: ingress.id,
+          trafficType: packet.type,
+        })
+        return
+      }
+
       const accepted = ingress.queue.enqueue(ingress.id, packet)
       ingress.queueDepth = ingress.queue.depth()
 
       this.recordEvent('packet.generated', {
-        detail: `${type === 'legitimate' ? 'User' : 'Adversary'} packet (${packet.size}B) arrived at ingress`,
+        detail: `${packet.type === 'legitimate' ? 'User' : 'Adversary'} packet (${packet.size}B) from ${packet.sourceIp} arrived at ingress`,
         nodeId: ingress.id,
         trafficType: packet.type,
       })
@@ -102,7 +174,7 @@ export class NetworkSimulation {
       if (!accepted) {
         ingress.droppedCount += 1
       }
-    }
+    })
   }
 
   private forwardPackets() {
@@ -167,6 +239,8 @@ export class NetworkSimulation {
         utilization: link.utilization,
       })),
       events: this.events,
+      attackMode: this.attackMode,
+      firewallRules: this.getFirewallRules(),
     }
   }
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import * as d3 from 'd3'
 import { NetworkSimulation } from '../simulation/network'
 import type { LinkState, SimulationEvent, SimulationSnapshot } from '../simulation/types'
+import { ControlsPanel } from './ControlsPanel'
 
 interface PositionedNode {
   id: string
@@ -52,6 +53,8 @@ export function NetworkGraph() {
     return { snapshot, positionedNodes: initializePositions(snapshot) }
   })
   const [events, setEvents] = useState<SimulationEvent[]>([])
+  const [attackMode, setAttackMode] = useState(simulationRef.current.getAttackMode())
+  const [firewallRules, setFirewallRules] = useState(simulationRef.current.getFirewallRules())
 
   useEffect(() => {
     const sim = simulationRef.current
@@ -63,6 +66,8 @@ export function NetworkGraph() {
         positionedNodes: mergeNodeState(prev.positionedNodes, snapshot.nodes),
       }))
       setEvents(snapshot.events)
+      setAttackMode(snapshot.attackMode)
+      setFirewallRules(snapshot.firewallRules)
     }, 900)
 
     return () => clearInterval(interval)
@@ -70,8 +75,24 @@ export function NetworkGraph() {
 
   useForceLayout(graphState, setGraphState)
 
+  const handleAttackModeChange = (mode: Parameters<NetworkSimulation['setAttackMode']>[0]) => {
+    simulationRef.current.setAttackMode(mode)
+    setAttackMode(mode)
+  }
+
+  const handleAddFirewallRule = (rule: { startIp: string; endIp: string; label?: string }) => {
+    simulationRef.current.addFirewallRule(rule)
+    setFirewallRules(simulationRef.current.getFirewallRules())
+  }
+
   return (
     <div className="network-graph">
+      <ControlsPanel
+        attackMode={attackMode}
+        firewallRules={firewallRules}
+        onAttackModeChange={handleAttackModeChange}
+        onAddFirewallRule={handleAddFirewallRule}
+      />
       <div className="graph-panel">
         <h2>Network flow simulation</h2>
         <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Network graph">

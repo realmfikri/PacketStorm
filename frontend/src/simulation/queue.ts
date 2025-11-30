@@ -45,11 +45,13 @@ export class PacketQueue {
   }
 }
 
-export function createPacket(type: TrafficType): Packet {
+export function createPacket(type: TrafficType, seed?: Partial<Packet>): Packet {
   return {
     id: crypto.randomUUID(),
     size: Math.max(50, Math.round(Math.random() * 900)),
     createdAt: Date.now(),
+    sourceIp: '0.0.0.0',
     type,
+    ...seed,
   }
 }

@@ -1,10 +1,19 @@
 export type TrafficType = 'legitimate' | 'attacker'
+export type AttackMode = 'idle' | 'pulse' | 'stealth' | 'flood'
+
+export interface FirewallRule {
+  id: string
+  label: string
+  startIp: string
+  endIp: string
+}
 
 export interface Packet {
   id: string
   size: number
   createdAt: number
   type: TrafficType
+  sourceIp: string
 }
 
 export interface NodeState {
@@ -31,9 +40,11 @@ export interface SimulationSnapshot {
   nodes: NodeState[]
   links: LinkState[]
   events: SimulationEvent[]
+  attackMode: AttackMode
+  firewallRules: FirewallRule[]
 }
 
-export type SimulationEventType = 'packet.dropped' | 'packet.forwarded' | 'packet.generated'
+export type SimulationEventType = 'packet.dropped' | 'packet.forwarded' | 'packet.generated' | 'packet.filtered' | 'firewall.updated'
 
 export interface SimulationEvent {
   id: string

@@ -301,8 +301,104 @@ h1 {
 
 .network-graph {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1.05fr 1.6fr 1.05fr;
   gap: 1rem;
+}
+
+.controls-panel {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 14px;
+  padding: 1rem;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  display: grid;
+  gap: 0.8rem;
+  align-content: start;
+}
+
+.controls-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.attack-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.attack-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  color: #e2e8f0;
+  text-align: left;
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.attack-card:hover {
+  border-color: rgba(34, 197, 94, 0.6);
+  transform: translateY(-2px);
+}
+
+.attack-card.active {
+  border-color: rgba(239, 68, 68, 0.7);
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.2);
+}
+
+.attack-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.firewall-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.field label {
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.field input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.45rem 0.6rem;
+  color: #e2e8f0;
+}
+
+.rules-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.rule-pill {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 0.5rem;
+}
+
+.rule-title {
+  margin: 0;
+  font-weight: 700;
 }
 
 .graph-panel {
