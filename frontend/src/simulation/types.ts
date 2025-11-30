@@ -44,7 +44,13 @@ export interface SimulationSnapshot {
   firewallRules: FirewallRule[]
 }
 
-export type SimulationEventType = 'packet.dropped' | 'packet.forwarded' | 'packet.generated' | 'packet.filtered' | 'firewall.updated'
+export type SimulationEventType =
+  | 'packet.dropped'
+  | 'packet.forwarded'
+  | 'packet.generated'
+  | 'packet.filtered'
+  | 'firewall.updated'
+  | 'topology.updated'
 
 export interface SimulationEvent {
   id: string

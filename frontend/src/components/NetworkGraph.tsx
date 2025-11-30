@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import * as d3 from 'd3'
-import { NetworkSimulation } from '../simulation/network'
-import type { LinkState, SimulationEvent, SimulationSnapshot } from '../simulation/types'
+import type { LinkState, SimulationSnapshot } from '../simulation/types'
 import { ControlsPanel } from './ControlsPanel'
+import { LiveLog } from './LiveLog'
+import { useSimulationStore, useSimulationTicker } from '../simulation/store'
 
 interface PositionedNode {
   id: string
@@ -47,51 +48,36 @@ function initializePositions(snapshot: SimulationSnapshot): PositionedNode[] {
 }
 
 export function NetworkGraph() {
-  const simulationRef = useRef(new NetworkSimulation())
-  const [graphState, setGraphState] = useState<GraphState>(() => {
-    const snapshot = simulationRef.current.snapshot()
-    return { snapshot, positionedNodes: initializePositions(snapshot) }
-  })
-  const [events, setEvents] = useState<SimulationEvent[]>([])
-  const [attackMode, setAttackMode] = useState(simulationRef.current.getAttackMode())
-  const [firewallRules, setFirewallRules] = useState(simulationRef.current.getFirewallRules())
+  const snapshot = useSimulationStore((state) => state.snapshot)
+  const attackMode = useSimulationStore((state) => state.attackMode)
+  const setAttackMode = useSimulationStore((state) => state.setAttackMode)
+  const addFirewallRule = useSimulationStore((state) => state.addFirewallRule)
+  const addServer = useSimulationStore((state) => state.addServer)
+
+  const [graphState, setGraphState] = useState<GraphState>(() => ({
+    snapshot,
+    positionedNodes: initializePositions(snapshot),
+  }))
+
+  useSimulationTicker()
 
   useEffect(() => {
-    const sim = simulationRef.current
-    const interval = setInterval(() => {
-      sim.tick()
-      const snapshot = sim.snapshot()
-      setGraphState((prev) => ({
-        snapshot,
-        positionedNodes: mergeNodeState(prev.positionedNodes, snapshot.nodes),
-      }))
-      setEvents(snapshot.events)
-      setAttackMode(snapshot.attackMode)
-      setFirewallRules(snapshot.firewallRules)
-    }, 900)
-
-    return () => clearInterval(interval)
-  }, [])
+    setGraphState((prev) => ({
+      snapshot,
+      positionedNodes: mergeNodeState(prev.positionedNodes, snapshot.nodes),
+    }))
+  }, [snapshot])
 
   useForceLayout(graphState, setGraphState)
-
-  const handleAttackModeChange = (mode: Parameters<NetworkSimulation['setAttackMode']>[0]) => {
-    simulationRef.current.setAttackMode(mode)
-    setAttackMode(mode)
-  }
-
-  const handleAddFirewallRule = (rule: { startIp: string; endIp: string; label?: string }) => {
-    simulationRef.current.addFirewallRule(rule)
-    setFirewallRules(simulationRef.current.getFirewallRules())
-  }
 
   return (
     <div className="network-graph">
       <ControlsPanel
         attackMode={attackMode}
-        firewallRules={firewallRules}
-        onAttackModeChange={handleAttackModeChange}
-        onAddFirewallRule={handleAddFirewallRule}
+        firewallRules={snapshot.firewallRules}
+        onAttackModeChange={setAttackMode}
+        onAddFirewallRule={addFirewallRule}
+        onAddServer={addServer}
       />
       <div className="graph-panel">
         <h2>Network flow simulation</h2>
@@ -105,7 +91,7 @@ export function NetworkGraph() {
         </svg>
       </div>
       <div className="graph-sidebar" aria-label="Simulation insights">
-        <EventFeed events={events} />
+        <LiveLog />
         <NodeQueueList nodes={graphState.snapshot.nodes} />
       </div>
     </div>
@@ -213,28 +199,6 @@ function LinkPath({ link, nodes }: { link: LinkState; nodes: PositionedNode[] })
       strokeLinecap="round"
       opacity={0.9}
     />
-  )
-}
-
-function EventFeed({ events }: { events: SimulationEvent[] }) {
-  return (
-    <div className="event-feed">
-      <h3>Recent events</h3>
-      <ul>
-        {events.length === 0 && <li className="muted">No events yet</li>}
-        {events.map((event) => (
-          <li key={event.id}>
-            <span className={`pill ${event.trafficType === 'attacker' ? 'critical' : 'healthy'}`}>
-              {event.trafficType ?? 'sys'}
-            </span>
-            <div>
-              <p className="event-title">{event.detail}</p>
-              <p className="event-time">{new Date(event.at).toLocaleTimeString()}</p>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
   )
 }
 
